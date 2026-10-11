@@ -1,0 +1,14 @@
+.auth-page{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:40px 20px;background:radial-gradient(ellipse at top,#8157ff12,transparent 65%),var(--bg);color:var(--text)}
+.swap-form{width:100%;max-width:440px;background:var(--soft);border:1px solid var(--border);border-radius:32px;overflow:hidden;box-shadow:0 16px 48px #20233c0a}
+.swap-form-panel{background:var(--surface);border-bottom:1px solid var(--border);border-radius:28px;padding:32px}
+.auth-eyebrow{font-size:10px;font-weight:700;letter-spacing:1.7px;color:var(--primary);margin-bottom:12px}
+.swap-form h1{font-size:28px;letter-spacing:-1px;line-height:1.25}.auth-subtitle{font-size:13px;color:var(--muted);margin:10px 0 26px}
+.auth-form{display:flex;flex-direction:column;gap:18px}.auth-field label{display:block;font-size:12px;font-weight:600;margin-bottom:7px}
+.auth-field input{width:100%;min-width:0;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);font-size:16px;outline:none}
+.auth-field input:focus{border-color:var(--primary);box-shadow:0 0 0 3px #8157ff20}.auth-field input[aria-invalid=true]{border-color:#dc5464}.auth-field input::placeholder{color:var(--muted)}
+.auth-field-error{color:#bc3448;font-size:12px;margin-top:6px}.auth-api-error{font-size:13px;color:#bc3448;background:#dc546410;border:1px solid #dc546430;padding:12px;border-radius:10px;overflow-wrap:anywhere}
+:root[data-theme=dark] .auth-field-error,:root[data-theme=dark] .auth-api-error{color:#ff9eaa}
+.auth-submit{width:100%;border-radius:12px;font-size:14px;padding:14px;margin-top:4px}.auth-loading{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.swap-form-footer{text-align:center;padding:20px 16px;font-size:12px;color:var(--muted)}.swap-form-footer button{border:0;background:transparent;padding:5px;color:var(--text);font-weight:700;font-size:12px}
+.auth-footnote{font-size:11px;color:var(--muted)}.auth-success{padding:12px 0;color:var(--green)}.auth-success h2{color:var(--text);font-size:19px;margin:15px 0 8px}.auth-success p,.auth-coming-soon p{font-size:13px;color:var(--muted)}.auth-coming-soon .button{margin-top:22px;cursor:not-allowed}
+@media(max-width:480px){.auth-page{padding:28px 16px;gap:22px}.swap-form-panel{padding:26px 22px}.swap-form h1{font-size:25px}}
