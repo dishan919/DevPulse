@@ -1,3 +1,6 @@
+import User from './models/User.js';
+import Workspace from './models/Workspace.js';
+import Membership from './models/Membership.js';
 import { createApp } from './app.js';
 import { readConfig } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './config/database.js';
@@ -5,6 +8,7 @@ let server;
 try {
   const config = readConfig();
   await connectDatabase(config.mongoUri);
+  await Promise.all([User.init(), Workspace.init(), Membership.init()]);
   server = createApp(config).listen(config.port, () => console.log(`DevPulse API listening on port ${config.port}`));
 } catch (error) {
   console.error(`Startup failed: ${error.message}`);
@@ -22,3 +26,4 @@ async function shutdown() {
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+

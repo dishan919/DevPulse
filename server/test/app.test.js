@@ -31,3 +31,11 @@ test('startup configuration rejects missing database and invalid ports', () => {
   assert.throws(() => readConfig({}), /MONGODB_URI/);
   assert.throws(() => readConfig({ MONGODB_URI: 'mongodb://localhost/test', PORT: '-1' }), /PORT/);
 });
+
+test('authentication configuration rejects weak secrets and insecure production origins', () => {
+  const base = { MONGODB_URI: 'mongodb://localhost/test' };
+  assert.throws(() => readConfig(base), /JWT_SECRET/);
+  assert.throws(() => readConfig({ ...base, JWT_SECRET: 'replace-with-placeholder-at-least-32-characters' }), /JWT_SECRET/);
+  assert.throws(() => readConfig({ ...base, JWT_SECRET: 'a'.repeat(48), NODE_ENV: 'production' }), /HTTPS/);
+});
+

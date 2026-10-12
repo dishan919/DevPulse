@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
+    sessionVersion: { type: Number, default: 0, select: true },
     name: {
       type: String,
       required: true,
@@ -19,6 +20,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: {
       type: String,
       required: true,
+      select: false,
     },
   },
   {
@@ -29,3 +31,4 @@ const userSchema = new mongoose.Schema(
 const User = mongoose.model("User", userSchema);
 
 export default User;
+

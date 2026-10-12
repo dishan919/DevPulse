@@ -1,71 +1,69 @@
 # DevPulse
 
-Distributed API Monitoring & Incident Management Platform. A university and portfolio project for understanding service availability, detecting outages, and coordinating recovery.
+Distributed API Monitoring & Incident Management Platform.
 
-## Current stage: architecture foundation
+## Current stage: authentication and workspace access control
 
-Implemented: a responsive React landing page and workspace shell, light/dark theme persistence, dashboard empty states, live API readiness checks with retry, and an Express API with MongoDB connectivity. Landing-page artwork is explicitly illustrative; application statistics are unavailable until real monitoring data exists.
+Implemented: React/Vite landing page and responsive application shell, light/dark theme, real account registration and login, JWT cookie sessions, session restoration, logout, default workspaces and owner memberships, workspace switching, backend membership/role authorization, and live API readiness checks. Protected application routes show real user/workspace details and an honest monitoring empty state.
 
-**This stage is not a production monitoring system.** Authentication, workspace membership, monitor CRUD, endpoint checks, incidents, analytics, notifications, and public status pages are not implemented. The preview workspace contains no private data and is not protected yet. Feature routes explain their implementation status instead of offering fake actions. The worker entry point exits explicitly because checks are not running.
+Monitor CRUD, actual monitoring, incidents, analytics, notifications, invitations/team management, Redis/BullMQ, Socket.IO and public status pages remain unimplemented. Landing artwork is illustrative. The worker deliberately exits because checks are not running.
 
-## Architecture
+## Setup
 
-```mermaid
-flowchart LR
-  React[React / Vite] -->|REST — implemented health API| API[Express API]
-  API --> Mongo[MongoDB]
-  API -. planned .-> Redis[Redis / BullMQ]
-  Redis -. planned .-> Worker[Separate monitoring worker]
-  Worker -. safe HTTP checks — planned .-> Endpoints[External APIs]
-  Worker -. persisted results — planned .-> Mongo
-  API -. authorized Socket.IO — planned .-> React
-```
-
-## Stack and structure
-
-JavaScript, React, Vite, React Router, Recharts, Express, Mongoose, Helmet, ESLint, Node's test runner, Vitest, and Supertest. Redis/BullMQ, JWT/bcrypt, and Socket.IO will be added in their implementation stages.
-
-```text
-client/src/  assets, components, context, hooks, layouts, pages, services, utils, styles
-server/src/  config, controllers, middleware, models, routes, services, validators,
-             utils, socket, jobs, app.js, server.js
-worker/src/  workers, services, jobs, utils, worker.js
-```
-
-## Local setup
-
-Requires Node.js 22.12+ (Node 24 recommended), npm, and MongoDB. From the project root:
+Requires Node.js 22.12+ and MongoDB with transaction support (replica set or Atlas). A standalone MongoDB server cannot perform registration transactions.
 
 ```powershell
 Copy-Item .env.example .env
 npm install
 docker compose up -d mongo
+node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 ```
 
-Docker is optional: a local MongoDB instance can use the default URI instead. In separate terminals:
+Put the generated secret into `JWT_SECRET` in your local `.env`. The example is deliberately rejected; never commit real secrets. Compose initializes a single-node `rs0` replica set. Wait until its health check reports healthy. An existing MongoDB volume is retained. For another database, configure its replica set URI in `MONGODB_URI`.
 
 ```sh
 npm run dev:server
 npm run dev:client
 ```
 
-Visit http://localhost:5173. The API listens on http://localhost:4000. Startup fails clearly if MongoDB cannot connect. The root `.env` is loaded by the server; Vite only exposes variables prefixed with `VITE_`. Set `VITE_API_URL` in `client/.env` if changing the default API address.
-
-`npm run dev:worker` currently reports that the engine is not implemented and exits with code 1. It will become a separate BullMQ process in the monitoring stage.
-
-## Environment
+Visit http://localhost:5173. API: http://localhost:4000. Use the same hostname for both services (do not mix localhost and 127.0.0.1). Root `.env` configures the server; use `client/.env` for `VITE_API_URL`. No secret belongs in a `VITE_` variable.
 
 | Variable | Purpose |
 | --- | --- |
 | PORT | API port, default 4000 |
-| MONGODB_URI | Required MongoDB connection string |
-| CLIENT_URL | Allowed frontend origin |
-| NODE_ENV | Runtime mode |
-| VITE_API_URL | Frontend API base URL; put in client/.env to override |
-| JWT_SECRET | Reserved for authentication; replace example before enabling auth |
-| REDIS_HOST / REDIS_PORT | Reserved for worker scheduling |
+| MONGODB_URI | Required transaction-capable MongoDB URI |
+| CLIENT_URL | Exact frontend origin; HTTPS required in production |
+| NODE_ENV | `production` enables Secure cookies |
+| JWT_SECRET | Required random secret of at least 32 characters; example values rejected |
+| VITE_API_URL | Frontend API base URL, default http://localhost:4000/api |
+| REDIS_HOST / REDIS_PORT | Reserved, unused |
 
-Never commit `.env` or real credentials.
+Production requires HTTPS and frontend/API on the same site for SameSite=Lax cookies. Cross-site deployment requires a separately reviewed cookie/CSRF design. Do not enable proxy trust without configuring the deployment's actual trusted proxy.
+
+## Authentication and authorization
+
+Registration validates name/email/password, normalizes email, hashes passwords using bcrypt (cost 12), and atomically creates a User, Workspace and unique owner Membership. Passwords require 12 characters with uppercase, lowercase and a number, and cannot exceed bcrypt's 72-byte limit. Duplicate emails return 409. Password hashes are excluded by default and explicitly omitted from API serializers.
+
+Login returns generic invalid-credential errors. Authentication uses HS256 JWTs with explicit issuer/audience and an eight-hour expiration, stored only in HttpOnly, SameSite=Lax cookies (Secure in production). No authentication token is stored in localStorage/sessionStorage or returned to JavaScript. Mutation requests require an Origin exactly matching CLIENT_URL, including login/register/logout, to prevent CSRF. CLI API requests must also supply this Origin header. CORS permits that frontend with credentials. Authentication attempts have an additional rate limit.
+
+`AuthProvider` restores `/auth/me`, owns login/register/logout and workspace state, and delays protected rendering until restoration completes. Session connection errors show a retry. Login/register redirect authenticated users to the dashboard. Logout increments a persisted session version, revoking all existing account sessions, clears the cookie and redirects through the route guard to login. Account-wide logout is intentional; no refresh tokens or per-device sessions exist yet.
+
+Future workspace APIs can compose `authenticate(config) ? requireWorkspaceMembership ? requireRole('owner', 'admin')`. Membership and role are always read from MongoDB; client-provided roles are ignored. Workspace switching changes the selected accessible workspace in memory; refreshing selects the first accessible workspace. No invitations or workspace creation UI is included.
+
+## API
+
+| Endpoint | Behavior |
+| --- | --- |
+| POST /api/auth/register | Creates account, workspace and owner membership; establishes session |
+| POST /api/auth/login | Validates credentials; establishes session |
+| GET /api/auth/me | Safe user and accessible workspaces; requires session |
+| POST /api/auth/logout | Revokes account sessions and clears cookie |
+| GET /api/workspaces/:workspaceId | Requires membership; returns safe workspace details |
+| GET /api/workspaces/:workspaceId/access | Owner/admin access check, returns current role |
+| GET /api/health | Process liveness |
+| GET /api/health/ready | Database readiness |
+
+Errors use `{ error: { code, message } }`. Unknown APIs return JSON 404. Helmet, request limits, safe errors and general rate limiting remain active.
 
 ## Validation
 
@@ -73,35 +71,14 @@ Never commit `.env` or real credentials.
 npm run lint
 npm test
 npm run build
-npm run preview -w client
 ```
 
-Backend tests verify liveness/readiness separation, safe errors, malformed JSON handling, configuration validation, CORS, and security headers without requiring MongoDB. Frontend service tests verify API data, errors, connection failures, and cancellation. These are foundation tests, not evidence of a functioning monitoring engine. Real MongoDB integration and browser flows need validation in subsequent stages.
+Backend tests include real MongoDB replica-set integration using mongodb-memory-server: registration, workspace/member creation, uniqueness, hashing and safe serialization, login, wrong credentials, missing/invalid/expired sessions, restoration, logout revocation, membership/role checks, ObjectId validation, Origin rejection and transaction rollback. First execution downloads a MongoDB test binary and requires network access. Existing health/security tests remain.
 
-## API overview
+Frontend tests cover API error handling/cancellation, form validation, failed/successful login, successful registration, guest redirects, authenticated access, session restoration/retry, logout and workspace switching. These tests do not establish production deployment readiness. Email verification, password reset, refresh/per-device sessions and end-to-end deployed browser verification remain future work.
 
-| Endpoint | Behavior |
-| --- | --- |
-| GET /api/health | Process liveness and implementation stage |
-| GET /api/health/ready | 200 when MongoDB is connected; 503 otherwise |
-| All other endpoints | JSON 404 |
+## Architecture and next stage
 
-## Security considerations
+React ? Express ? MongoDB. The monitoring worker, Redis/BullMQ scheduling and Socket.IO remain planned. `npm run dev:worker` reports that monitoring is unavailable and exits with code 1.
 
-The API uses Helmet, a JSON body size limit, rate limiting, configured CORS, safe error responses, and environment configuration. These controls do not replace authentication and authorization. Do not expose this foundation as a production service.
-
-The worker will perform requests to untrusted URLs. Before enabling it, implement SSRF defenses that resolve and validate all IPv4/IPv6 addresses, pin requests to validated addresses, block loopback/private/link-local/metadata ranges, reject unsafe redirects or revalidate every hop, and use bounded timeouts and response sizes. No user-provided URLs are fetched in this stage.
-
-Docker Compose currently starts MongoDB only and binds its port to loopback. Redis, API, worker, frontend containers, and production deployment configuration belong to later stages. No deployments or pushes are performed.
-
-## Next implementation stages
-
-1. Mongoose user/workspace/membership models, bcrypt/JWT authentication, backend role authorization, protected frontend routes, and auth tests.
-2. Persistent monitor CRUD, validation, public visibility settings, and workspace switching.
-3. Redis/BullMQ scheduling, safe HTTP checks, failure thresholds, incident creation/recovery, and worker tests.
-4. Real history and analytics, authorized Socket.IO updates, notifications, team/settings management, public status pages.
-5. Safe demo seed data, complete Docker environment, integration tests, CI, and deployment hardening.
-
-## Screenshots
-
-Capture the landing page, light/dark dashboard, and mobile workspace after browser verification. Subsequent screenshots should show actual seeded database data and working monitoring flows.
+**Next: Persistent Monitor CRUD + validation + workspace ownership + public/private visibility settings.** After that: safe HTTP checks with SSRF protections, scheduling, incidents, analytics and notifications. No monitoring URLs are fetched in this stage. No pushes or deployments are performed.
